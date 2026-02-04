@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Scheduled job enqueuer
+# Called by LaunchAgent at scheduled times to add jobs to the queue.
+# Jobs will be processed by the worker when conditions are met.
+
+require "faktory"
+require "time"
+
+# Current time info for scheduling logic
+NOW = Time.now
+WEEKDAY = !NOW.saturday? && !NOW.sunday?
+HOUR = NOW.hour
+
+def enqueue(job_type, queue, args = {})
+  client = Faktory::Client.new
+  jid = client.push(
+    "jobtype" => job_type,
+    "queue" => queue,
+    "args" => [args]
+  )
+  puts "[#{NOW}] Enqueued #{job_type} -> #{queue} (#{jid})"
+  jid
+end
+
+# Morning jobs (6 AM)
+if HOUR == 6
+  # Email cleanup - weekdays only
+  if WEEKDAY
+    enqueue("EmailCleanupJob", "work-laptop")
+  end
+
+  # Granola sync - every day
+  enqueue("GranolaSyncJob", "any")
+end
+
+# Add more schedules here:
+#
+# if HOUR == 9 && WEEKDAY
+#   enqueue("CalendarSyncJob", "work-laptop")
+# end
+#
+# if HOUR == 18
+#   enqueue("DailySummaryJob", "any")
+# end
+
+puts "[#{NOW}] Scheduled job check complete"

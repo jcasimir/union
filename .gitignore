@@ -1,0 +1,21 @@
+# Environment files with secrets
+.env
+
+# Ruby
+Gemfile.lock
+.bundle/
+vendor/bundle/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Faktory data (if running locally for testing)
+faktory_data/

@@ -1,0 +1,11 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+gem "faktory_worker_ruby", "~> 1.1"
+
+# For running Claude commands
+gem "open3"  # stdlib, but explicit
+
+# For structured logging
+gem "logger"

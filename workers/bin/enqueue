@@ -1,0 +1,43 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Simple script to enqueue jobs to Faktory
+#
+# Usage:
+#   ./bin/enqueue EmailCleanupJob
+#   ./bin/enqueue GranolaSyncJob '{"force": true}'
+#   ./bin/enqueue ClaudeJob '"Run /some-skill"'
+
+require "faktory"
+require "json"
+
+JOB_TYPE = ARGV[0]
+ARGS = ARGV[1] ? JSON.parse(ARGV[1]) : {}
+
+unless JOB_TYPE
+  puts "Usage: enqueue <JobType> [args_json]"
+  puts ""
+  puts "Examples:"
+  puts "  enqueue EmailCleanupJob"
+  puts "  enqueue GranolaSyncJob '{\"force\": true}'"
+  puts "  enqueue ClaudeJob '\"Run the /commit skill\"'"
+  exit 1
+end
+
+# Map job types to their queues
+QUEUE_MAP = {
+  "EmailCleanupJob" => "work-laptop",
+  "GranolaSyncJob" => "any",
+  "ClaudeJob" => "any"
+}
+
+queue = QUEUE_MAP[JOB_TYPE] || "any"
+
+client = Faktory::Client.new
+jid = client.push(
+  "jobtype" => JOB_TYPE,
+  "queue" => queue,
+  "args" => [ARGS]
+)
+
+puts "Enqueued #{JOB_TYPE} to queue '#{queue}' with jid: #{jid}"

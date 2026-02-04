@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  faktory:
+    image: contribsys/faktory:latest
+    container_name: faktory
+    restart: unless-stopped
+    ports:
+      # Bind to Tailscale IP only - replace with your server's Tailscale IP
+      # Find it with: tailscale ip -4
+      - "${TAILSCALE_IP:-0.0.0.0}:7419:7419"  # Worker port
+      - "${TAILSCALE_IP:-0.0.0.0}:7420:7420"  # Web UI port
+    environment:
+      - FAKTORY_PASSWORD=${FAKTORY_PASSWORD:?Set FAKTORY_PASSWORD in .env}
+    volumes:
+      - faktory_data:/var/lib/faktory
+    # Optional: limit resources
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 512M
+
+volumes:
+  faktory_data:

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.faktory-worker</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <!-- Update this path to your workers directory -->
+        <string>cd ~/Projects/granola-sync/workers && /usr/local/bin/bundle exec ruby worker.rb</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- Update with your Faktory server's Tailscale IP and password -->
+        <key>FAKTORY_URL</key>
+        <string>tcp://:YOUR_PASSWORD@100.x.x.x:7419</string>
+
+        <!-- Queues this machine processes -->
+        <key>FAKTORY_QUEUES</key>
+        <string>work-laptop,any</string>
+
+        <!-- Ensure Ruby/bundle are found -->
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+
+    <!-- Run at load and keep running -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Restart if it crashes -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>/tmp/faktory-worker.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/faktory-worker.error.log</string>
+</dict>
+</plist>
