@@ -20,7 +20,7 @@ A distributed job queue for personal automation tasks, powered by [Faktory](http
 │   ┌────────┴────────┐               ┌───────────────┐       │
 │   │  Work MacBook   │               │ Personal Mac  │       │
 │   │  Worker:        │               │ Worker:       │       │
-│   │  work-laptop    │               │ personal-mac  │       │
+│   │  work-web    │               │ personal-mac  │       │
 │   └─────────────────┘               └───────────────┘       │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
@@ -54,7 +54,7 @@ bundle install
 
 # Set environment variables
 export FAKTORY_URL="tcp://:your-password@100.x.x.x:7419"
-export FAKTORY_QUEUES="work-laptop,any"
+export FAKTORY_QUEUES="work-web,any"
 
 # Test the worker
 bundle exec ruby worker.rb
@@ -75,7 +75,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.scheduled-jobs.
 
 | Job | Queue | Requirements | Description |
 |-----|-------|--------------|-------------|
-| `EmailCleanupJob` | work-laptop | Chrome, screen unlocked | Auto-archive inbox emails |
+| `EmailCleanupJob` | work-web | Chrome, screen unlocked | Auto-archive inbox emails |
 | `GranolaSyncJob` | any | granola-cli installed | Sync meeting notes to local files |
 | `ClaudeJob` | any | Claude CLI | Run arbitrary Claude prompts |
 
@@ -87,5 +87,5 @@ Jobs that require specific conditions (like `EmailCleanupJob` needing an unlocke
 
 - **Tailscale** = Secure access from anywhere without public exposure
 - **Faktory** = Battle-tested job queue with web UI, retries, scheduling
-- **Queues for routing** = Jobs go to specific machines (work-laptop, personal-mac, any)
+- **Queues for routing** = Jobs go to specific machines (work-web, personal-mac, any)
 - **Manual LaunchAgent install** = Avoids SentinelOne flagging Claude for persistence

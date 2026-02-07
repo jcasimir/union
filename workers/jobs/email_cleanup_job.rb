@@ -1,59 +1,61 @@
 # frozen_string_literal: true
 
-require "open3"
-require "shellwords"
-
 # Job for automated email inbox cleanup
-# Requires: Chrome running, MCP extension active, screen unlocked
-class EmailCleanupJob
-  include Faktory::Job
+class EmailCleanupJob < BrowserJob
+  faktory_options queue: 'work-web', unique_for: 10_800
 
-  faktory_options queue: "work-laptop"  # Only runs on work machine
+  def action_prompt(options)
+    <<~ACTION.strip
+      Automatically scan and archive low-priority emails from Outlook Web inbox. Use Chrome MCP browser tools (mcp__claude-in-chrome__*).
 
-  def perform(options = {})
-    LOGGER.info "Starting email cleanup job..."
+      ## Archive Confidence Scoring
 
-    # Check preconditions
-    unless screen_unlocked?
-      raise RetryLater, "Screen is locked - will retry when unlocked"
-    end
+      ### High Confidence (95%) - Always Archive
+      - Transient auth codes: Slack confirmation codes, Anthropic login links, verification codes
+      - Automated digests: Confluence daily/weekly digest, Jira digest notifications
+      - System notifications: Automated "no-reply" sender addresses
 
-    unless chrome_running?
-      LOGGER.info "Chrome not running, attempting to launch..."
-      system("open -a 'Google Chrome'")
-      sleep 3
-    end
+      ### Medium-High Confidence (90%) - Archive
+      - Meeting responses: Subject contains "Accepted", "Meeting accepted", "Declined" (but NOT "Declined:" which may need attention)
+      - Calendar notifications: Calendly "New Event:" notifications
+      - Automated updates: Technology Bi-Weekly, newsletter-style recurring emails
 
-    # Run the Claude auto-archive skill
-    prompt = "Run the /auto-archive-inbox skill"
+      ### Medium Confidence (70-85%) - Review Case-by-Case
+      - Company announcements, document shares without urgent context, non-actionable reminders
 
-    stdout, stderr, status = Open3.capture3(
-      "claude", "--dangerously-skip-permissions", "-p", prompt
-    )
+      ### Low Confidence (< 70%) - Keep in Inbox
+      - ACTION ITEM in subject
+      - Direct requests from colleagues with questions
+      - IT tickets (TSD-* responses)
+      - Warnings/alerts: suspension warnings, security alerts, deadline reminders
+      - New meeting invites (not responses)
 
-    if status.success?
-      LOGGER.info "Email cleanup completed"
-      { success: true, output: stdout }
-    else
-      LOGGER.error "Email cleanup failed: #{stderr}"
-      raise "Email cleanup failed: #{stderr}"
-    end
+      ### Subject patterns to archive
+      confirmation code, Secure link to log in, New Event:, Meeting accepted, Accepted:, daily digest, weekly digest, Technology Bi-Weekly
+
+      ### Subject patterns to protect (never archive)
+      ACTION ITEM, URGENT, TSD-\\d+, will be suspended, password expir, security alert
+
+      ### Sender patterns to archive
+      no-reply@, noreply@, notifications@, confluence@, jira@, calendly.com, slack.com
+
+      ## Steps
+
+      1. Navigate to #{Config.get("outlook.inbox_url")} in Chrome
+      2. Scan the inbox, extracting for each email: sender name/email, subject, date, preview text
+      3. Scroll down to load more emails. Repeat until end of inbox or emails older than 30 days
+      4. Score each email using the confidence criteria above (default threshold: 85%)
+      5. For emails meeting threshold: right-click the email row, select "Archive" from context menu, wait for confirmation, continue to next
+      6. Output summary:
+         - Total scanned, total archived
+         - List of archived items with subject, sender, score, reason
+         - List of kept items below threshold
+         - List of protected items that are never archived
+
+      ## Error Handling
+      - If archive action fails on an email, log and continue to next
+      - If scroll doesn't load new emails after 3 attempts, assume end of inbox
+      - Always output summary even if errors occur
+    ACTION
   end
-
-  private
-
-  def screen_unlocked?
-    # Check if screen is locked on macOS
-    result = `python3 -c "import Quartz; d=Quartz.CGSessionCopyCurrentDictionary(); print('unlocked' if not d.get('CGSSessionScreenIsLocked', False) else 'locked')" 2>/dev/null`.strip
-    result == "unlocked"
-  rescue
-    true  # Assume unlocked if check fails
-  end
-
-  def chrome_running?
-    system("pgrep -x 'Google Chrome' > /dev/null 2>&1")
-  end
-
-  # Custom error for jobs that should retry later
-  class RetryLater < StandardError; end
 end

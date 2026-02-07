@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Union is a distributed job queue for personal automation, powered by Faktory and accessible via Tailscale. It enables jobs to be enqueued from anywhere and routed to specific machines (work-laptop, personal-mac, or any) for execution.
+Union is a distributed job queue for personal automation, powered by Faktory and accessible via Tailscale. It enables jobs to be enqueued from anywhere and routed to specific machines (work-web, personal-mac, or any) for execution.
 
 ## Architecture
 
@@ -17,7 +17,7 @@ Tailscale Network
     └── Ruby workers using faktory_worker_ruby gem
 ```
 
-**Job routing**: Jobs specify a queue (e.g., `work-laptop`, `any`). Workers subscribe to queues matching their machine, enabling machine-specific automation.
+**Job routing**: Jobs specify a queue (e.g., `work-web`, `any`). Workers subscribe to queues matching their machine, enabling machine-specific automation.
 
 **Condition checking**: Jobs like `EmailCleanupJob` verify preconditions (screen unlocked, Chrome running) before executing. Failed conditions raise errors triggering Faktory retries.
 
@@ -63,7 +63,7 @@ launchctl bootout gui/$(id -u)/com.user.faktory-worker  # Stop
 ## Key Environment Variables
 
 - `FAKTORY_URL` - Connection string: `tcp://:password@100.x.x.x:7419`
-- `FAKTORY_QUEUES` - Comma-separated queues to process: `work-laptop,any`
+- `FAKTORY_QUEUES` - Comma-separated queues to process: `work-web,any`
 
 ## Adding New Jobs
 
@@ -72,7 +72,7 @@ Create `workers/jobs/my_job.rb`:
 ```ruby
 class MyJob
   include Faktory::Job
-  faktory_options queue: "any"  # or "work-laptop", "personal-mac"
+  faktory_options queue: "any"  # or "work-web", "personal-mac"
 
   def perform(options = {})
     # Job logic here

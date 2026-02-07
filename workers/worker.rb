@@ -10,17 +10,22 @@ require "json"
 LOGGER = Logger.new($stdout)
 LOGGER.level = Logger::INFO
 
+# Load config and set env vars before anything else
+require_relative "lib/config"
+Config.export_env!
+Config.validate!
+
 # Load all job classes
 Dir[File.join(__dir__, "jobs", "*.rb")].each { |f| require f }
 
-# Faktory configuration
-Faktory.configure_worker do |config|
-  # Queues this worker processes (in priority order)
-  # Set via FAKTORY_QUEUES env var, e.g., "work-laptop,any"
-  queues = ENV.fetch("FAKTORY_QUEUES", "any").split(",")
-  config.queues = queues
-
-  LOGGER.info "Worker configured for queues: #{queues.join(', ')}"
+# Log when jobs start and finish
+Faktory.configure_worker do |mgr|
+  mgr.on(:startup) do
+    queues = Faktory.options&.dig(:queues) || ["default"]
+    LOGGER.info "Worker ready, listening on queues: #{queues.join(', ')}. Waiting for jobs..."
+  end
+  mgr.on(:quiet) { LOGGER.info "Worker going quiet (shutting down soon)..." }
+  mgr.on(:shutdown) { LOGGER.info "Worker shutting down" }
 end
 
 # Base class for jobs that run Claude commands
@@ -62,11 +67,4 @@ class ClaudeJob
   end
 end
 
-# Start the worker if run directly
-if __FILE__ == $PROGRAM_NAME
-  LOGGER.info "Starting Faktory worker..."
-  LOGGER.info "FAKTORY_URL: #{ENV['FAKTORY_URL']&.gsub(/:[^:@]+@/, ':***@')}"
-
-  # Run the worker
-  Faktory::CLI.new.run
-end
+# Start the worker with: bundle exec faktory-worker -r ./worker.rb

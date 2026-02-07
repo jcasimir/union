@@ -19,3 +19,6 @@ vendor/bundle/
 
 # Faktory data (if running locally for testing)
 faktory_data/
+
+# LaunchAgent plists (contain secrets)
+launchagents/*.plist

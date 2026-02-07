@@ -14,13 +14,14 @@ class GranolaSyncJob
 
   faktory_options queue: "any"
 
-  DEFAULT_NOTES_DIR = "~/GDrive/Meeting Notes/From Granola"
-  NOTES_DIR = File.expand_path(ENV.fetch("GRANOLA_NOTES_PATH", DEFAULT_NOTES_DIR))
+  def self.notes_dir
+    @notes_dir ||= File.expand_path(Config.get("granola.notes_dir"))
+  end
 
   def perform(options = {})
     LOGGER.info "Starting Granola sync..."
 
-    FileUtils.mkdir_p(NOTES_DIR)
+    FileUtils.mkdir_p(self.class.notes_dir)
 
     # Fetch all meetings from API
     meetings = fetch_meetings(options["limit"] || 200)
@@ -59,7 +60,7 @@ class GranolaSyncJob
 
   def scan_local_meeting_ids
     # Extract meeting IDs from filenames like: 2026-02-04-meeting-title-[abc12345].md
-    ids = Dir.glob(File.join(NOTES_DIR, "*.md")).map do |path|
+    ids = Dir.glob(File.join(self.class.notes_dir, "*.md")).map do |path|
       filename = File.basename(path, ".md")
       # Match the [shortid] at the end of filename
       match = filename.match(/\[([a-f0-9]{8})\]$/)
@@ -88,7 +89,7 @@ class GranolaSyncJob
 
     # Write to file
     filename = build_filename(meeting)
-    filepath = File.join(NOTES_DIR, filename)
+    filepath = File.join(self.class.notes_dir, filename)
     File.write(filepath, markdown)
 
     LOGGER.info "  Saved: #{filename}"

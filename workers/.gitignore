@@ -1,0 +1,3 @@
+tasks/pending/*.json
+tasks/done/*.json
+config.yml

@@ -9,28 +9,21 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <!-- Update this path to your workers directory -->
-        <string>cd ~/Projects/granola-sync/workers && ./bin/enqueue-scheduled</string>
+        <string>cd ~/Projects/union/workers &amp;&amp; ./bin/enqueue-scheduled</string>
     </array>
 
     <key>EnvironmentVariables</key>
     <dict>
-        <key>FAKTORY_URL</key>
-        <string>tcp://:YOUR_PASSWORD@100.x.x.x:7419</string>
         <key>PATH</key>
         <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
     </dict>
 
-    <!-- Run at 6 AM every day -->
     <key>StartCalendarInterval</key>
     <dict>
-        <key>Hour</key>
-        <integer>6</integer>
         <key>Minute</key>
         <integer>0</integer>
     </dict>
 
-    <!-- Logging -->
     <key>StandardOutPath</key>
     <string>/tmp/scheduled-jobs.log</string>
     <key>StandardErrorPath</key>

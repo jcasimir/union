@@ -15,13 +15,9 @@
 
     <key>EnvironmentVariables</key>
     <dict>
-        <!-- Update with your Faktory server's Tailscale IP and password -->
-        <key>FAKTORY_URL</key>
-        <string>tcp://:YOUR_PASSWORD@100.x.x.x:7419</string>
-
         <!-- Queues this machine processes -->
         <key>FAKTORY_QUEUES</key>
-        <string>work-laptop,any</string>
+        <string>work-web,any</string>
 
         <!-- Ensure Ruby/bundle are found -->
         <key>PATH</key>
