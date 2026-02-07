@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require "json"
-require "fileutils"
+require "open3"
+require "shellwords"
 
-# Base class for jobs that dispatch task files to a persistent Claude session.
+# Base class for jobs that run Claude with Chrome MCP browser tools.
 # Subclasses define `action_prompt(options)` and optionally override `job_name`.
 #
 # Example:
@@ -16,12 +16,6 @@ require "fileutils"
 #   end
 class BrowserJob
   include Faktory::Job
-
-  TASKS_DIR = File.expand_path("../tasks", __dir__)
-  PENDING_DIR = File.join(TASKS_DIR, "pending")
-  DONE_DIR = File.join(TASKS_DIR, "done")
-  POLL_INTERVAL = 5
-  POLL_TIMEOUT = 1800
 
   def perform(options = {})
     LOGGER.info "Starting #{job_name}..."
@@ -36,9 +30,20 @@ class BrowserJob
       sleep 3
     end
 
-    jid = SecureRandom.hex(12)
-    write_task(jid, options)
-    wait_for_result(jid)
+    prompt = action_prompt(options)
+    LOGGER.info "Running Claude with Chrome MCP..."
+
+    stdout, stderr, status = Open3.capture3(
+      "claude", "--dangerously-skip-permissions", "--chrome", "-p", prompt
+    )
+
+    if status.success?
+      LOGGER.info "#{job_name} completed successfully"
+      { success: true, output: stdout }
+    else
+      LOGGER.error "#{job_name} failed: #{stderr}"
+      raise "#{job_name} failed: #{stderr}"
+    end
   end
 
   # Subclasses must implement this
@@ -50,44 +55,6 @@ class BrowserJob
 
   def job_name
     self.class.name
-  end
-
-  def write_task(jid, options)
-    FileUtils.mkdir_p(PENDING_DIR)
-    task = {
-      jid: jid,
-      job: job_name,
-      action: action_prompt(options),
-      created_at: Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-    }
-    path = File.join(PENDING_DIR, "#{jid}.json")
-    File.write(path, JSON.pretty_generate(task))
-    LOGGER.info "Wrote task file: #{path}"
-  end
-
-  def wait_for_result(jid)
-    result_path = File.join(DONE_DIR, "#{jid}.json")
-    elapsed = 0
-
-    while elapsed < POLL_TIMEOUT
-      if File.exist?(result_path)
-        result = JSON.parse(File.read(result_path))
-        LOGGER.info "Task #{jid} completed: #{result['status']}"
-        LOGGER.info "Output: #{result['output']}"
-
-        if result['status'] == 'error'
-          raise "#{job_name} failed: #{result['output']}"
-        end
-
-        return { success: true, output: result['output'] }
-      end
-
-      sleep POLL_INTERVAL
-      elapsed += POLL_INTERVAL
-      LOGGER.info "Waiting for task #{jid} result... (#{elapsed}s)" if (elapsed % 30).zero?
-    end
-
-    raise "Task #{jid} timed out after #{POLL_TIMEOUT}s - no result file found"
   end
 
   def screen_unlocked?
