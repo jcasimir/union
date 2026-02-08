@@ -13,18 +13,27 @@ A distributed job queue for personal automation tasks, powered by [Faktory](http
 │   ┌─────────────────────┐                                    │
 │   │  Faktory Server     │                                    │
 │   │  (Home Linux box)   │                                    │
-│   │  100.x.x.x:7419     │                                    │
+│   │  127.0.0.1:7419     │                                    │
 │   └─────────────────────┘                                    │
 │            ▲                                                 │
 │            │                                                 │
 │   ┌────────┴────────┐               ┌───────────────┐       │
 │   │  Work MacBook   │               │ Personal Mac  │       │
 │   │  Worker:        │               │ Worker:       │       │
-│   │  work-web    │               │ personal-mac  │       │
+│   │  work-web, any  │               │ personal-mac  │       │
 │   └─────────────────┘               └───────────────┘       │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+### How Jobs Execute
+
+1. **LaunchAgent** runs `bin/enqueue-scheduled` every hour, enqueuing jobs based on time/day
+2. **Faktory worker** (also a LaunchAgent) pulls jobs from queues and executes them
+3. **Browser jobs** (`BrowserJob` subclasses) shell out to `claude --chrome -p` which connects to Chrome via the Claude-in-Chrome MCP extension
+4. **Non-browser jobs** (`ClaudeJob`, `GranolaSyncJob`) run directly without Chrome
+
+The Chrome MCP extension is **single-tenant** — only one `claude --chrome` session can connect at a time. If a browser job is running, don't start ad-hoc Chrome MCP sessions.
 
 ## Components
 
@@ -52,40 +61,78 @@ docker-compose up -d
 cd workers
 bundle install
 
-# Set environment variables
-export FAKTORY_URL="tcp://:your-password@100.x.x.x:7419"
-export FAKTORY_QUEUES="work-web,any"
+# Create config from template and fill in secrets
+cp config.yml.example config.yml
+# Edit config.yml with your Faktory URL, Google Calendar creds, etc.
 
 # Test the worker
-bundle exec ruby worker.rb
+bundle exec faktory-worker -q work-web -q any -r ./worker.rb
 ```
 
 ### 3. Install LaunchAgents
 
-Edit the plists in `launchagents/` with your configuration, then:
+**You must run these commands yourself** (not Claude) to avoid SentinelOne detection.
 
 ```bash
-# YOU must run these commands (not Claude) to avoid SentinelOne detection
 cp launchagents/*.plist ~/Library/LaunchAgents/
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.faktory-worker.plist
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.scheduled-jobs.plist
 ```
+
+### LaunchAgent Management
+
+```bash
+# Check status
+launchctl print gui/$(id -u)/com.user.faktory-worker
+
+# View logs
+tail -f /tmp/faktory-worker.log
+tail -f /tmp/scheduled-jobs.log
+
+# Restart process (keeps same plist config)
+launchctl kickstart -k gui/$(id -u)/com.user.faktory-worker
+
+# Reload after editing a plist (must bootout + bootstrap to pick up changes)
+launchctl bootout gui/$(id -u)/com.user.faktory-worker
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.faktory-worker.plist
+```
+
+**Important**: `kickstart -k` restarts the process but does **not** reload plist changes. After editing a plist, you must `bootout` then `bootstrap` to pick up the new definition.
+
+## Configuration
+
+All secrets and settings live in `workers/config.yml` (gitignored). Copy from the template:
+
+```bash
+cp workers/config.yml.example workers/config.yml
+```
+
+The Config module loads this at startup for both the worker and the enqueue scripts. It also exports `FAKTORY_URL` and `GCAL_*` env vars so downstream tools (Faktory gem, curl commands) can use them.
 
 ## Job Types
 
 | Job | Queue | Requirements | Description |
 |-----|-------|--------------|-------------|
 | `EmailCleanupJob` | work-web | Chrome, screen unlocked | Auto-archive inbox emails |
+| `SlackDmTriageJob` | work-web | Chrome, screen unlocked | Triage Slack DMs into Jira tasks |
+| `LinkedinDmTriageJob` | work-web | Chrome, screen unlocked | Triage LinkedIn messages into Jira tasks |
+| `CalendarSyncJob` | work-web | Chrome, screen unlocked | Sync Outlook calendar to Google Calendar |
 | `GranolaSyncJob` | any | granola-cli installed | Sync meeting notes to local files |
 | `ClaudeJob` | any | Claude CLI | Run arbitrary Claude prompts |
 
 ## Condition-Based Execution
 
-Jobs that require specific conditions (like `EmailCleanupJob` needing an unlocked screen) will check those conditions before executing. If conditions aren't met, the job raises an error and Faktory will retry later.
+Browser jobs check preconditions before executing:
+- **Screen unlocked** — checked via `ioreg` (macOS Quartz API)
+- **Chrome running** — checked via `pgrep`, launched if not running
+
+If conditions aren't met, the job raises an error and Faktory retries later.
 
 ## Why This Architecture?
 
 - **Tailscale** = Secure access from anywhere without public exposure
 - **Faktory** = Battle-tested job queue with web UI, retries, scheduling
 - **Queues for routing** = Jobs go to specific machines (work-web, personal-mac, any)
+- **`claude --chrome -p`** = Browser jobs run Claude CLI with Chrome MCP, no persistent session needed
+- **config.yml** = Single source of truth for secrets, synced manually across machines
 - **Manual LaunchAgent install** = Avoids SentinelOne flagging Claude for persistence
