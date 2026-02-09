@@ -27,3 +27,8 @@ launchagents/*.plist
 .playwright-mcp/
 .playwright-cli/
 .auth-state/
+
+# Job output artifacts (written by Claude during automated runs)
+workers/logs/
+workers/archive_summary.md
+workers/archive_emails.rb

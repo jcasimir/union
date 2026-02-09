@@ -6,24 +6,41 @@ A distributed job queue for personal automation tasks, powered by [Faktory](http
 
 ## Architecture
 
-```
-                    Tailscale Network
-┌──────────────────────────────────────────────────────────────┐
-│                                                              │
-│   ┌─────────────────────┐                                    │
-│   │  Faktory Server     │                                    │
-│   │  (Home Linux box)   │                                    │
-│   │  127.0.0.1:7419     │                                    │
-│   └─────────────────────┘                                    │
-│            ▲                                                 │
-│            │                                                 │
-│   ┌────────┴────────┐               ┌───────────────┐       │
-│   │  Work MacBook   │               │ Personal Mac  │       │
-│   │  Worker:        │               │ Worker:       │       │
-│   │  work-web, any  │               │ personal-mac  │       │
-│   └─────────────────┘               └───────────────┘       │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph tailscale ["Tailscale Network"]
+        subgraph server ["Home Linux Box"]
+            faktory["Faktory Server\n:7419 / :7420"]
+        end
+
+        subgraph work ["Work MacBook"]
+            la_sched["LaunchAgent\n(hourly cron)"]
+            la_worker["LaunchAgent\n(KeepAlive)"]
+            enqueue["bin/enqueue-scheduled"]
+            worker["Faktory Worker"]
+            claude["Claude CLI\n(--model sonnet)"]
+            playwright["Playwright CLI\n(named sessions)"]
+            granola["granola-cli"]
+
+            la_sched -- runs --> enqueue
+            enqueue -- pushes jobs --> faktory
+            la_worker -- keeps alive --> worker
+        end
+
+        subgraph personal ["Personal Mac"]
+            worker2["Faktory Worker"]
+        end
+
+        faktory -- "work-web, any" --> worker
+        faktory -- "personal-mac, any" --> worker2
+        worker -- "BrowserJob" --> claude --> playwright
+        worker -- "GranolaSyncJob" --> granola
+    end
+
+    style tailscale fill:transparent,stroke:#666
+    style server fill:transparent,stroke:#999
+    style work fill:transparent,stroke:#999
+    style personal fill:transparent,stroke:#999
 ```
 
 ### How Jobs Execute
@@ -118,6 +135,25 @@ The Config module loads this at startup for both the worker and the enqueue scri
 | `GranolaSyncJob` | any | granola-cli installed | Sync meeting notes to local files |
 | `ClaudeJob` | any | Claude CLI | Run arbitrary Claude prompts |
 | `SessionHealthJob` | any | playwright-cli | Verify Playwright sessions are authenticated and refresh state files |
+
+## Job Schedule
+
+All scheduling logic lives in `bin/enqueue-scheduled`, triggered hourly by a LaunchAgent. Jobs with `unique_for` deduplication are marked — only the first enqueue within that window actually runs.
+
+| Job | Schedule | Hours | Days |
+|-----|----------|-------|------|
+| **SessionHealthJob** | every 4h | 0, 4, 8, 12, 16, 20 | every day |
+| **GranolaSyncJob** | daily | 6 | every day |
+| **CalendarSyncJob** (full) | 2x/week | 4 | Mon, Thu |
+| **CalendarSyncJob** (mid) | nightly | 5 | every day |
+| **EmailCleanupJob** | every 3h | 6, 9, 12, 15, 18 | weekdays |
+| **CalendarSyncJob** (fast) | every 3h | 6, 9, 12, 15, 18 | weekdays |
+| **SlackDmTriageJob** | 3x morning | 7, 9, 11 | weekdays |
+| **LinkedinDmTriageJob** | 3x morning | 7, 9, 11 | weekdays |
+
+**Weekend:** Only GranolaSyncJob (6am) and SessionHealthJob (every 4h) run. All other jobs are weekday-only.
+
+**Deduplication:** SlackDmTriageJob (`unique_for: 24h`) and LinkedinDmTriageJob (`unique_for: 24h`) are enqueued at 7, 9, and 11 but only the first successful enqueue runs — the others are deduplicated by Faktory.
 
 ## Condition-Based Execution
 

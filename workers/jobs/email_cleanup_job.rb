@@ -63,8 +63,8 @@ class EmailCleanupJob < BrowserJob
       3. Scroll down to load more emails. Repeat until end of inbox or emails older than 30 days
       4. Score each email using the confidence criteria above (default threshold: 85%)
       5. For emails meeting threshold: right-click the email row, select "Archive" from context menu, wait for confirmation, continue to next
-      6. Output summary:
-         - Total scanned, total archived
+      6. Write a summary log to `logs/email-cleanup/YYYY-MM-DD_HHMMSS.md` (create the directory if needed). Include:
+         - Date/time and total scanned, total archived
          - List of archived items with subject, sender, score, reason
          - List of kept items below threshold
          - List of protected items that are never archived
