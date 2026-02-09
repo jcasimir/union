@@ -22,3 +22,8 @@ faktory_data/
 
 # LaunchAgent plists (contain secrets)
 launchagents/*.plist
+
+# Playwright
+.playwright-mcp/
+.playwright-cli/
+.auth-state/

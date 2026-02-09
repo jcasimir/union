@@ -1,0 +1,132 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Verifies that Playwright CLI sessions are authenticated for each
+# work service. Opens headed Chromium windows for any that need login.
+#
+# Usage:
+#   bin/auth-check              # check all services
+#   bin/auth-check outlook      # check one service
+#   bin/auth-check --status     # just show session status
+#
+# Sessions stay open after this script runs. Minimize the Chromium
+# windows and they'll be ready for automation.
+
+require_relative "../lib/config"
+
+AUTH_STATE_DIR = File.expand_path("../../.auth-state", __dir__)
+Dir.mkdir(AUTH_STATE_DIR) unless Dir.exist?(AUTH_STATE_DIR)
+
+# Each service: name, URL to check, text that appears when authenticated
+SERVICES = {
+  "outlook" => {
+    url: Config.get("outlook.inbox_url"),
+    pattern: /inbox|focused|other/i
+  },
+  "outlook-calendar" => {
+    url: Config.get("outlook.calendar_url"),
+    pattern: /calendar|today|week/i
+  },
+  "slack-greatminds" => {
+    url: Config.get("slack.workspaces.greatminds.url"),
+    pattern: /unreads|threads|channel/i
+  },
+  "slack-turing" => {
+    url: Config.get("slack.workspaces.turing.url"),
+    pattern: /unreads|threads|channel/i
+  },
+  "jira" => {
+    url: "https://digital-greatminds.atlassian.net/jira/core/projects/JC/board",
+    pattern: /board|backlog|sprint/i
+  },
+  "linkedin" => {
+    url: Config.get("linkedin.feed_url"),
+    pattern: /feed|home|network/i
+  }
+}.freeze
+
+def run_cli(session, *args)
+  cmd = ["playwright-cli", "-s=#{session}", *args]
+  output = `#{cmd.join(" ")} 2>&1`
+  [output, $?.success?]
+end
+
+def active_sessions
+  output, = run_cli("_", "list")
+  output.scan(/^- (\S+):/).flatten
+end
+
+def check_service(name, config)
+  puts ""
+  puts "--- #{name} ---"
+
+  active = active_sessions
+  if active.include?(name)
+    puts "  Session open, checking auth..."
+  else
+    puts "  Starting headed session..."
+    run_cli(name, "open", config[:url], "--headed")
+    sleep 3
+  end
+
+  # Navigate (in case session was on a different page)
+  run_cli(name, "goto", config[:url])
+  sleep 2
+
+  # Snapshot and check for auth indicator
+  snapshot, = run_cli(name, "snapshot")
+
+  if snapshot.match?(config[:pattern])
+    puts "  ✓ AUTHENTICATED"
+    run_cli(name, "state-save", File.join(AUTH_STATE_DIR, "#{name}.json"))
+    puts "  State saved to .auth-state/#{name}.json"
+    true
+  else
+    puts "  ✗ NEEDS LOGIN — check the '#{name}' Chromium window"
+    puts "  After logging in, re-run: bin/auth-check #{name}"
+    false
+  end
+end
+
+# --status flag: just show what's running
+if ARGV.include?("--status")
+  puts "Active Playwright sessions:"
+  output, = run_cli("_", "list")
+  puts output
+  exit
+end
+
+# Single service or all
+if ARGV.any? && !ARGV[0].start_with?("--")
+  target = ARGV[0]
+  unless SERVICES.key?(target)
+    puts "Unknown service: #{target}"
+    puts "Available: #{SERVICES.keys.join(", ")}"
+    exit 1
+  end
+  check_service(target, SERVICES[target])
+else
+  puts "Playwright Auth Check"
+  puts "====================="
+
+  results = SERVICES.map { |name, config| [name, check_service(name, config)] }
+
+  puts ""
+  puts "Summary"
+  puts "-------"
+  results.each do |name, ok|
+    puts "  #{ok ? "✓" : "✗"} #{name}"
+  end
+
+  failed = results.reject { |_, ok| ok }
+  if failed.any?
+    puts ""
+    puts "#{failed.length} service(s) need login. Check the headed browser windows."
+  else
+    puts ""
+    puts "All services authenticated. Sessions are running — minimize the windows."
+  end
+end
+
+puts ""
+puts "To close all sessions: playwright-cli close-all"

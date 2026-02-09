@@ -52,3 +52,28 @@ rake granola:status                         # Show local vs API meeting count
 1. Create `jobs/my_job.rb` with `include Faktory::Job` and `faktory_options queue: "any"`
 2. Add queue mapping to `QUEUE_MAP` in `bin/enqueue` if using a non-default queue
 3. Add scheduling logic to `bin/enqueue-scheduled` if the job should run on a cron
+
+## Browser Automation: Playwright CLI vs Chrome MCP
+
+Browser jobs currently use Chrome MCP via `claude --chrome -p`. Playwright CLI (`playwright-cli`) is available as an alternative that's more token-efficient and supports persistent sessions without needing Chrome.
+
+### When to use Playwright CLI
+- Scripted, repeatable flows (navigate, fill, click, screenshot) where steps are known in advance
+- Token-sensitive work — CLI commands are short strings, not full MCP tool schemas
+- When you need persistent auth sessions across multiple job runs
+
+### When to keep Chrome MCP
+- Exploratory browsing where you need the full accessibility tree in context to decide next steps
+- When the job needs to react dynamically to varied page states
+- Jobs that use other MCP tools alongside browser (e.g., Atlassian MCP in SlackDmTriageJob)
+
+### Auth check
+Run `bin/auth-check` to verify Playwright sessions are authenticated for all services. It opens headed Chromium windows, checks for auth, and saves state to `.auth-state/`. Named sessions: `outlook`, `outlook-calendar`, `slack-greatminds`, `slack-turing`, `jira`, `linkedin`.
+
+```bash
+bin/auth-check              # check all
+bin/auth-check outlook      # check one
+bin/auth-check --status     # show active sessions
+```
+
+Auth state files in `.auth-state/<name>.json` can be loaded with `playwright-cli -s=<name> state-load .auth-state/<name>.json` to restore a session without re-logging in (works until the token expires).
