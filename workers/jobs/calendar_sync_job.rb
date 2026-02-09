@@ -9,10 +9,27 @@
 class CalendarSyncJob < BrowserJob
   faktory_options queue: 'work-web', unique_for: 7_200
 
+  def playwright_session
+    "outlook-calendar"
+  end
+
   def action_prompt(options)
     mode = options["mode"] || "fast"
     <<~ACTION.strip
-      Sync Outlook calendar events to Google Calendar. Use Chrome MCP browser tools (mcp__claude-in-chrome__*) to read Outlook and curl via Bash for the Google Calendar API.
+      Sync Outlook calendar events to Google Calendar. Use playwright-cli via Bash to read Outlook and curl via Bash for the Google Calendar API.
+
+      ## Browser Automation
+
+      Use playwright-cli via Bash for all browser interaction. Session: -s=outlook-calendar
+
+      Key commands:
+      - playwright-cli -s=outlook-calendar goto <url>              # navigate
+      - playwright-cli -s=outlook-calendar snapshot                 # get element refs
+      - playwright-cli -s=outlook-calendar click <ref>              # click element
+      - playwright-cli -s=outlook-calendar fill <ref> "<text>"      # fill input
+      - playwright-cli -s=outlook-calendar screenshot --filename=<file>  # verify visually
+
+      Always run `snapshot` to get refs before clicking. Read the snapshot output to find the correct ref.
 
       Sync mode: #{mode}
       - fast = next 3 days
@@ -28,8 +45,8 @@ class CalendarSyncJob < BrowserJob
       ## Steps
 
       ### 1. Read Outlook Calendar (Browser)
-      1. Navigate to #{Config.get("outlook.calendar_url")} in Chrome
-      2. Use read_page to get the calendar structure
+      1. Navigate to #{Config.get("outlook.calendar_url")} using `playwright-cli -s=outlook-calendar goto`
+      2. Run `snapshot` to get the calendar structure and element refs
       3. For each event in the date range, extract:
          - Title, start time (ISO), end time (ISO), location, attendees, your response status
       4. For events without visible IDs, construct a pseudo-ID: outlook:{title-hash}:{start-iso-timestamp}

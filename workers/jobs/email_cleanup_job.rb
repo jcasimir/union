@@ -4,9 +4,26 @@
 class EmailCleanupJob < BrowserJob
   faktory_options queue: 'work-web', unique_for: 10_800
 
+  def playwright_session
+    "outlook"
+  end
+
   def action_prompt(options)
     <<~ACTION.strip
-      Automatically scan and archive low-priority emails from Outlook Web inbox. Use Chrome MCP browser tools (mcp__claude-in-chrome__*).
+      Automatically scan and archive low-priority emails from Outlook Web inbox.
+
+      ## Browser Automation
+
+      Use playwright-cli via Bash for all browser interaction. Session: -s=outlook
+
+      Key commands:
+      - playwright-cli -s=outlook goto <url>              # navigate
+      - playwright-cli -s=outlook snapshot                 # get element refs
+      - playwright-cli -s=outlook click <ref>              # click element
+      - playwright-cli -s=outlook fill <ref> "<text>"      # fill input
+      - playwright-cli -s=outlook screenshot --filename=<file>  # verify visually
+
+      Always run `snapshot` to get refs before clicking. Read the snapshot output to find the correct ref.
 
       ## Archive Confidence Scoring
 
@@ -41,8 +58,8 @@ class EmailCleanupJob < BrowserJob
 
       ## Steps
 
-      1. Navigate to #{Config.get("outlook.inbox_url")} in Chrome
-      2. Scan the inbox, extracting for each email: sender name/email, subject, date, preview text
+      1. Navigate to #{Config.get("outlook.inbox_url")} using `playwright-cli -s=outlook goto`
+      2. Run `snapshot` and scan the inbox, extracting for each email: sender name/email, subject, date, preview text
       3. Scroll down to load more emails. Repeat until end of inbox or emails older than 30 days
       4. Score each email using the confidence criteria above (default threshold: 85%)
       5. For emails meeting threshold: right-click the email row, select "Archive" from context menu, wait for confirmation, continue to next
