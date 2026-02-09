@@ -117,6 +117,7 @@ The Config module loads this at startup for both the worker and the enqueue scri
 | `CalendarSyncJob` | work-web | Playwright session `outlook-calendar`, screen unlocked | Sync Outlook calendar to Google Calendar |
 | `GranolaSyncJob` | any | granola-cli installed | Sync meeting notes to local files |
 | `ClaudeJob` | any | Claude CLI | Run arbitrary Claude prompts |
+| `SessionHealthJob` | any | playwright-cli | Verify Playwright sessions are authenticated and refresh state files |
 
 ## Condition-Based Execution
 

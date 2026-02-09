@@ -36,6 +36,8 @@ rake granola:status                         # Show local vs API meeting count
 
 **`bin/enqueue`** — Pushes a job to Faktory using `Faktory::Client`. Contains `QUEUE_MAP` that maps job class names to queue names — update this when adding new jobs with custom queues.
 
+**`SessionHealthJob`** — Verifies Playwright sessions are authenticated and refreshes state files. Owns the `SERVICES` constant (single source of truth for service names, URLs, and auth patterns). `bin/auth-check` reads from `SessionHealthJob::SERVICES` — add new services only in the job class.
+
 **`bin/enqueue-scheduled`** — Called by a LaunchAgent on a cron schedule. Contains time-based logic (hour/weekday checks) to enqueue jobs at specific times.
 
 **`lib/profile_validator.rb`** — YAML profile validator, usable standalone (`ruby lib/profile_validator.rb profile.yaml`) or via Rake tasks.
@@ -69,7 +71,7 @@ Jobs that also need Jira/Confluence access (e.g., `SlackDmTriageJob`, `LinkedinD
 | `LinkedinDmTriageJob` | `linkedin` |
 
 ### Auth check
-Run `bin/auth-check` to verify Playwright sessions are authenticated for all services. It opens headed Chromium windows, checks for auth, and saves state to `.auth-state/`. Named sessions: `outlook`, `outlook-calendar`, `slack-greatminds`, `slack-turing`, `jira`, `linkedin`.
+Run `bin/auth-check` to interactively verify Playwright sessions are authenticated for all services. It opens headed Chromium windows, checks for auth, and saves state to `.auth-state/`. Service definitions (names, URLs, auth patterns) live in `SessionHealthJob::SERVICES` — `bin/auth-check` is a thin interactive wrapper around that constant.
 
 ```bash
 bin/auth-check              # check all

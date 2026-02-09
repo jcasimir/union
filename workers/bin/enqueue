@@ -34,7 +34,8 @@ QUEUE_MAP = {
   "LinkedinDmTriageJob" => "work-web",
   "CalendarSyncJob" => "work-web",
   "GranolaSyncJob" => "any",
-  "ClaudeJob" => "any"
+  "ClaudeJob" => "any",
+  "SessionHealthJob" => "any"
 }
 
 queue = QUEUE_MAP[JOB_TYPE] || "any"

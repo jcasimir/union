@@ -60,4 +60,9 @@ if [1, 4].include?(NOW.wday) && HOUR == 4  # Monday and Thursday at 4 AM
   enqueue("CalendarSyncJob", "work-web", { "mode" => "full" })
 end
 
+# Session health check - every 4 hours (keeps auth state warm)
+if (HOUR % 4).zero?
+  enqueue("SessionHealthJob", "any")
+end
+
 puts "[#{NOW}] Scheduled job check complete"

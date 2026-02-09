@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Verifies that Playwright CLI sessions are authenticated for each
-# work service. Opens headed Chromium windows for any that need login.
+# Interactive auth helper for Playwright sessions.
+# Service definitions live in SessionHealthJob::SERVICES.
 #
 # Usage:
 #   bin/auth-check              # check all services
@@ -14,36 +14,24 @@
 
 require_relative "../lib/config"
 
-AUTH_STATE_DIR = File.expand_path("../../.auth-state", __dir__)
-Dir.mkdir(AUTH_STATE_DIR) unless Dir.exist?(AUTH_STATE_DIR)
+# Stub Faktory::Job for standalone execution (no Faktory connection needed)
+module Faktory
+  module Job
+    def self.included(base)
+      base.extend(ClassMethods)
+    end
+    module ClassMethods
+      def faktory_options(*); end
+    end
+  end
+end
 
-# Each service: name, URL to check, text that appears when authenticated
-SERVICES = {
-  "outlook" => {
-    url: Config.get("outlook.inbox_url"),
-    pattern: /inbox|focused|other/i
-  },
-  "outlook-calendar" => {
-    url: Config.get("outlook.calendar_url"),
-    pattern: /calendar|today|week/i
-  },
-  "slack-greatminds" => {
-    url: Config.get("slack.workspaces.greatminds.url"),
-    pattern: /unreads|threads|channel/i
-  },
-  "slack-turing" => {
-    url: Config.get("slack.workspaces.turing.url"),
-    pattern: /unreads|threads|channel/i
-  },
-  "jira" => {
-    url: "https://digital-greatminds.atlassian.net/jira/core/projects/JC/board",
-    pattern: /board|backlog|sprint/i
-  },
-  "linkedin" => {
-    url: Config.get("linkedin.feed_url"),
-    pattern: /feed|home|network/i
-  }
-}.freeze
+require_relative "../jobs/browser_job"
+require_relative "../jobs/session_health_job"
+
+SERVICES = SessionHealthJob::SERVICES
+AUTH_STATE_DIR = SessionHealthJob::AUTH_STATE_DIR
+Dir.mkdir(AUTH_STATE_DIR) unless Dir.exist?(AUTH_STATE_DIR)
 
 def run_cli(session, *args)
   cmd = ["playwright-cli", "-s=#{session}", *args]
@@ -60,20 +48,20 @@ def check_service(name, config)
   puts ""
   puts "--- #{name} ---"
 
+  url = SessionHealthJob.url_for(name)
   active = active_sessions
+
   if active.include?(name)
     puts "  Session open, checking auth..."
   else
     puts "  Starting headed session..."
-    run_cli(name, "open", config[:url], "--headed")
+    run_cli(name, "open", url, "--headed")
     sleep 3
   end
 
-  # Navigate (in case session was on a different page)
-  run_cli(name, "goto", config[:url])
+  run_cli(name, "goto", url)
   sleep 2
 
-  # Snapshot and check for auth indicator
   snapshot, = run_cli(name, "snapshot")
 
   if snapshot.match?(config[:pattern])
