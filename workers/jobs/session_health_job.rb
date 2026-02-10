@@ -28,11 +28,11 @@ class SessionHealthJob
     },
     "slack-greatminds" => {
       url_key: "slack.workspaces.greatminds.url",
-      pattern: /unreads|threads|channel/i
+      pattern: /great-minds\.slack\.com|unreads|threads|channel/i
     },
     "slack-turing" => {
       url_key: "slack.workspaces.turing.url",
-      pattern: /unreads|threads|channel/i
+      pattern: /turingschool\.slack\.com|unreads|threads|channel/i
     },
     "jira" => {
       url_key: nil,

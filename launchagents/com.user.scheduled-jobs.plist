@@ -9,7 +9,7 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>cd ~/Projects/union/workers &amp;&amp; ./bin/enqueue-scheduled</string>
+        <string>cd ~/Projects/union/workers &amp;&amp; ruby ./bin/enqueue-scheduled</string>
     </array>
 
     <key>EnvironmentVariables</key>
