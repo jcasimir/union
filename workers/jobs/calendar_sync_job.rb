@@ -48,9 +48,20 @@ class CalendarSyncJob < BrowserJob
       1. Navigate to #{Config.get("outlook.calendar_url")} using `playwright-cli -s=outlook-calendar goto`
       2. Run `snapshot` to get the calendar structure and element refs
       3. For each event in the date range, extract:
-         - Title, start time (ISO), end time (ISO), location, attendees, your response status
+         - Title, start time (ISO), end time (ISO), meeting URL, attendees, your response status
       4. For events without visible IDs, construct a pseudo-ID: outlook:{title-hash}:{start-iso-timestamp}
-      5. Click into events if needed to get full details (attendees, location)
+
+      #### Extracting Meeting URLs (Critical)
+      Almost every event has a Zoom URL. Extract it carefully:
+      - In the week view snapshot, Zoom URLs appear as child elements of event buttons, e.g.:
+        `- generic [ref=e649]: https://greatminds.zoom.us/j/95355532133?pwd=...`
+        They also appear in the button's accessible name string.
+      - Look for URLs matching `https://.*zoom.us/j/\\d+` in both the button label and child text nodes.
+      - If an event does NOT have a visible Zoom URL in the week view, click into the event
+        to open its detail view and look for the meeting link there. Press Escape to close the detail and continue.
+      - Use the full Zoom URL (including ?pwd= and any query params) as the event's location.
+      - Do NOT use the literal string "Zoom" as the location — always use the actual URL.
+      - If no meeting URL can be found after checking the detail view, set location to empty string.
 
       ### 2. Get Google Calendar Access Token
       ```bash
@@ -70,7 +81,7 @@ class CalendarSyncJob < BrowserJob
         --data-urlencode "timeMin=${START_DATE}T00:00:00Z" \\
         --data-urlencode "timeMax=${END_DATE}T23:59:59Z" \\
         --data-urlencode "maxResults=250" \\
-        | jq '.items[] | {id, summary, description, start, end}'
+        | jq '.items[] | {id, summary, description, location, start, end}'
       ```
       Find events with [OUTLOOK-ID: ...] in their description to identify already-synced events.
 
@@ -82,30 +93,36 @@ class CalendarSyncJob < BrowserJob
         -H "Content-Type: application/json" \\
         -d '{
           "summary": "{event_title}",
-          "description": "[OUTLOOK-ID: {outlook_id}]\\n\\nAttendees: {attendee_list}\\nLocation: {location}",
-          "location": "{location}",
+          "description": "[OUTLOOK-ID: {outlook_id}]\\n\\nAttendees: {attendee_list}",
+          "location": "{zoom_url_or_empty}",
           "start": {"dateTime": "{start_iso}", "timeZone": "#{Config.get("google_calendar.timezone")}"},
           "end": {"dateTime": "{end_iso}", "timeZone": "#{Config.get("google_calendar.timezone")}"}
         }'
       ```
+      IMPORTANT: The "location" field must be the full Zoom URL (e.g., https://greatminds.zoom.us/j/12345?pwd=abc),
+      NOT the word "Zoom". Google Calendar makes the location clickable, so a real URL lets users join directly.
 
       ### 5. Update Existing Events
-      If an event exists but details changed (title, time, location):
+      If an event exists but details changed (title, time, location, or a missing/wrong Zoom URL):
       ```bash
       curl -s -X PATCH "https://www.googleapis.com/calendar/v3/calendars/${OUTLOOK_CAL_ID}/events/{gcal_event_id}" \\
         -H "Authorization: Bearer $ACCESS_TOKEN" \\
         -H "Content-Type: application/json" \\
-        -d '{"summary": "{updated_title}", "location": "{updated_location}"}'
+        -d '{"summary": "{updated_title}", "location": "{zoom_url_or_empty}"}'
       ```
+      Always update if the existing event has location "Zoom" (literal string) but the Outlook event has a full URL.
 
       ### 6. Report Results
       Summarize: mode, date range, events processed, created, already synced, updated, errors/skipped.
 
       ## Tips
+      - In the week view snapshot, each event is a button element. The button's accessible name contains
+        the title, time, and often the Zoom URL. Child generic elements also contain the URL as text.
       - Look for data-* attributes on event elements for IDs, or check the URL when viewing details
       - Try agenda/list view if week view is hard to parse
       - Wait for loading spinners before reading page
       - Scroll to trigger lazy loading of events
+      - When clicking into an event for details, look for "Join" links or URLs in the detail panel
     ACTION
   end
 end
