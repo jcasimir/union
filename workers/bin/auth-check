@@ -49,6 +49,7 @@ def check_service(name, config)
   puts "--- #{name} ---"
 
   url = SessionHealthJob.url_for(name)
+  puts "  URL: #{url}"
   active = active_sessions
 
   if active.include?(name)

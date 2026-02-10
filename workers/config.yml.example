@@ -15,10 +15,10 @@ google_calendar:
 slack:
   workspaces:
     greatminds:
-      url: https://app.slack.com/client/T049HCH7W
+      url: https://great-minds.slack.com
       prefix: GM-DM
     turing:
-      url: https://app.slack.com/client/T029P2S9M
+      url: https://turingschool.slack.com
       prefix: TS-DM
 
 outlook:
