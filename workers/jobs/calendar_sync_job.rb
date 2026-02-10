@@ -103,14 +103,19 @@ class CalendarSyncJob < BrowserJob
       NOT the word "Zoom". Google Calendar makes the location clickable, so a real URL lets users join directly.
 
       ### 5. Update Existing Events
-      If an event exists but details changed (title, time, location, or a missing/wrong Zoom URL):
+      For EVERY already-synced event, check if it needs a location update. PATCH the event if ANY of these are true:
+      - The Google Calendar event has location "Zoom" (literal string) — replace with the real URL
+      - The Google Calendar event has no location but Outlook has a Zoom URL
+      - The title, start time, or end time changed
+
+      Do NOT skip events just because the OUTLOOK-ID matches. You must compare the location field.
+
       ```bash
       curl -s -X PATCH "https://www.googleapis.com/calendar/v3/calendars/${OUTLOOK_CAL_ID}/events/{gcal_event_id}" \\
         -H "Authorization: Bearer $ACCESS_TOKEN" \\
         -H "Content-Type: application/json" \\
-        -d '{"summary": "{updated_title}", "location": "{zoom_url_or_empty}"}'
+        -d '{"summary": "{title}", "location": "{zoom_url_or_empty}"}'
       ```
-      Always update if the existing event has location "Zoom" (literal string) but the Outlook event has a full URL.
 
       ### 6. Report Results
       Summarize: mode, date range, events processed, created, already synced, updated, errors/skipped.
