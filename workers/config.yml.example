@@ -1,0 +1,32 @@
+faktory:
+  url: tcp://:YOUR_PASSWORD@127.0.0.1:7419
+
+jira:
+  cloud_id: digital-greatminds.atlassian.net
+  project_key: JC
+
+google_calendar:
+  client_id: "YOUR_CLIENT_ID"
+  client_secret: "YOUR_CLIENT_SECRET"
+  refresh_token: "YOUR_REFRESH_TOKEN"
+  calendar_id: jcasimirbot@gmail.com
+  timezone: America/Denver
+
+slack:
+  workspaces:
+    greatminds:
+      url: https://app.slack.com/client/T049HCH7W
+      prefix: GM-DM
+    turing:
+      url: https://app.slack.com/client/T029P2S9M
+      prefix: TS-DM
+
+outlook:
+  inbox_url: https://outlook.office.com/mail/inbox
+  calendar_url: https://outlook.office.com/calendar/view/week
+
+linkedin:
+  feed_url: https://www.linkedin.com/feed/
+
+granola:
+  notes_dir: ~/GDrive/Meeting Notes/From Granola

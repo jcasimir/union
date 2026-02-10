@@ -9,23 +9,14 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <!-- Update this path to your workers directory -->
-        <string>cd ~/Projects/granola-sync/workers && /usr/local/bin/bundle exec ruby worker.rb</string>
+        <string>cd ~/Projects/union/workers && bundle exec faktory-worker -q work-web -q any -r ./worker.rb</string>
     </array>
 
     <key>EnvironmentVariables</key>
     <dict>
-        <!-- Update with your Faktory server's Tailscale IP and password -->
-        <key>FAKTORY_URL</key>
-        <string>tcp://:YOUR_PASSWORD@100.x.x.x:7419</string>
-
-        <!-- Queues this machine processes -->
-        <key>FAKTORY_QUEUES</key>
-        <string>work-laptop,any</string>
-
         <!-- Ensure Ruby/bundle are found -->
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <string>/Users/jeff.casimir/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
     </dict>
 
     <!-- Run at load and keep running -->

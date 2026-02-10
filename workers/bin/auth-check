@@ -1,0 +1,120 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Interactive auth helper for Playwright sessions.
+# Service definitions live in SessionHealthJob::SERVICES.
+#
+# Usage:
+#   bin/auth-check              # check all services
+#   bin/auth-check outlook      # check one service
+#   bin/auth-check --status     # just show session status
+#
+# Sessions stay open after this script runs. Minimize the Chromium
+# windows and they'll be ready for automation.
+
+require_relative "../lib/config"
+
+# Stub Faktory::Job for standalone execution (no Faktory connection needed)
+module Faktory
+  module Job
+    def self.included(base)
+      base.extend(ClassMethods)
+    end
+    module ClassMethods
+      def faktory_options(*); end
+    end
+  end
+end
+
+require_relative "../jobs/browser_job"
+require_relative "../jobs/session_health_job"
+
+SERVICES = SessionHealthJob::SERVICES
+AUTH_STATE_DIR = SessionHealthJob::AUTH_STATE_DIR
+Dir.mkdir(AUTH_STATE_DIR) unless Dir.exist?(AUTH_STATE_DIR)
+
+def run_cli(session, *args)
+  cmd = ["playwright-cli", "-s=#{session}", *args]
+  output = `#{cmd.join(" ")} 2>&1`
+  [output, $?.success?]
+end
+
+def active_sessions
+  output, = run_cli("_", "list")
+  output.scan(/^- (\S+):/).flatten
+end
+
+def check_service(name, config)
+  puts ""
+  puts "--- #{name} ---"
+
+  url = SessionHealthJob.url_for(name)
+  active = active_sessions
+
+  if active.include?(name)
+    puts "  Session open, checking auth..."
+  else
+    puts "  Starting headed session..."
+    run_cli(name, "open", url, "--headed")
+    sleep 3
+  end
+
+  run_cli(name, "goto", url)
+  sleep 2
+
+  snapshot, = run_cli(name, "snapshot")
+
+  if snapshot.match?(config[:pattern])
+    puts "  ✓ AUTHENTICATED"
+    run_cli(name, "state-save", File.join(AUTH_STATE_DIR, "#{name}.json"))
+    puts "  State saved to .auth-state/#{name}.json"
+    true
+  else
+    puts "  ✗ NEEDS LOGIN — check the '#{name}' Chromium window"
+    puts "  After logging in, re-run: bin/auth-check #{name}"
+    false
+  end
+end
+
+# --status flag: just show what's running
+if ARGV.include?("--status")
+  puts "Active Playwright sessions:"
+  output, = run_cli("_", "list")
+  puts output
+  exit
+end
+
+# Single service or all
+if ARGV.any? && !ARGV[0].start_with?("--")
+  target = ARGV[0]
+  unless SERVICES.key?(target)
+    puts "Unknown service: #{target}"
+    puts "Available: #{SERVICES.keys.join(", ")}"
+    exit 1
+  end
+  check_service(target, SERVICES[target])
+else
+  puts "Playwright Auth Check"
+  puts "====================="
+
+  results = SERVICES.map { |name, config| [name, check_service(name, config)] }
+
+  puts ""
+  puts "Summary"
+  puts "-------"
+  results.each do |name, ok|
+    puts "  #{ok ? "✓" : "✗"} #{name}"
+  end
+
+  failed = results.reject { |_, ok| ok }
+  if failed.any?
+    puts ""
+    puts "#{failed.length} service(s) need login. Check the headed browser windows."
+  else
+    puts ""
+    puts "All services authenticated. Sessions are running — minimize the windows."
+  end
+end
+
+puts ""
+puts "To close all sessions: playwright-cli close-all"

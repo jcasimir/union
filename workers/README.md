@@ -18,7 +18,7 @@ Set these environment variables (add to your shell profile):
 export FAKTORY_URL="tcp://:your-password@100.x.x.x:7419"
 
 # Which queues this machine should process
-export FAKTORY_QUEUES="work-laptop,any"  # For work machine
+export FAKTORY_QUEUES="work-web,any"  # For work machine
 # export FAKTORY_QUEUES="personal-mac,any"  # For personal machine
 ```
 
@@ -36,7 +36,7 @@ bundle exec faktory-worker -r ./worker.rb
 
 | Job | Queue | Requires | Description |
 |-----|-------|----------|-------------|
-| `EmailCleanupJob` | work-laptop | Chrome, unlocked | Runs auto-archive-inbox skill |
+| `EmailCleanupJob` | work-web | Chrome, unlocked | Runs auto-archive-inbox skill |
 | `GranolaSyncJob` | any | granola-cli | Syncs meeting notes to ~/Documents/granola-notes |
 | `ClaudeJob` | any | Claude CLI | Generic job that runs any Claude prompt |
 
@@ -60,7 +60,7 @@ Create a new file in `jobs/`:
 class MyNewJob
   include Faktory::Job
 
-  faktory_options queue: "any"  # or "work-laptop", "personal-mac"
+  faktory_options queue: "any"  # or "work-web", "personal-mac"
 
   def perform(options = {})
     # Your job logic here

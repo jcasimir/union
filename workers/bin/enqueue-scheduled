@@ -5,6 +5,9 @@
 # Called by LaunchAgent at scheduled times to add jobs to the queue.
 # Jobs will be processed by the worker when conditions are met.
 
+require_relative "../lib/config"
+Config.export_env!
+
 require "faktory"
 require "time"
 
@@ -24,25 +27,42 @@ def enqueue(job_type, queue, args = {})
   jid
 end
 
-# Morning jobs (6 AM)
-if HOUR == 6
-  # Email cleanup - weekdays only
-  if WEEKDAY
-    enqueue("EmailCleanupJob", "work-laptop")
-  end
+# Email cleanup - every 3 hours on weekdays (6, 9, 12, 15, 18)
+if WEEKDAY && HOUR >= 6 && HOUR <= 18 && (HOUR % 3).zero?
+  enqueue("EmailCleanupJob", "work-web")
+end
 
-  # Granola sync - every day
+# Slack DM triage - weekdays, first hit wins (unique_for: 24h per workspace)
+if WEEKDAY && [7, 9, 11].include?(HOUR)
+  enqueue("SlackDmTriageJob", "work-web", { "workspace" => "greatminds" })
+  enqueue("SlackDmTriageJob", "work-web", { "workspace" => "turing" })
+end
+
+# LinkedIn DM triage - weekdays, first hit wins (unique_for: 24h)
+if WEEKDAY && [7, 9, 11].include?(HOUR)
+  enqueue("LinkedinDmTriageJob", "work-web")
+end
+
+# Granola sync - 6 AM every day
+if HOUR == 6
   enqueue("GranolaSyncJob", "any")
 end
 
-# Add more schedules here:
-#
-# if HOUR == 9 && WEEKDAY
-#   enqueue("CalendarSyncJob", "work-laptop")
-# end
-#
-# if HOUR == 18
-#   enqueue("DailySummaryJob", "any")
-# end
+# Calendar sync - fast every 3 hours weekdays, mid nightly, full Mon/Thu
+# unique_for: 2h prevents overlapping fast syncs
+if WEEKDAY && HOUR >= 6 && HOUR <= 18 && (HOUR % 3).zero?
+  enqueue("CalendarSyncJob", "work-web", { "mode" => "fast" })
+end
+if HOUR == 5
+  enqueue("CalendarSyncJob", "work-web", { "mode" => "mid" })
+end
+if [1, 4].include?(NOW.wday) && HOUR == 4  # Monday and Thursday at 4 AM
+  enqueue("CalendarSyncJob", "work-web", { "mode" => "full" })
+end
+
+# Session health check - every 4 hours (keeps auth state warm)
+if (HOUR % 4).zero?
+  enqueue("SessionHealthJob", "any")
+end
 
 puts "[#{NOW}] Scheduled job check complete"

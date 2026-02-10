@@ -1,0 +1,116 @@
+# frozen_string_literal: true
+
+require "json"
+require "logger"
+require "open3"
+require "fileutils"
+require "set"
+
+LOGGER = Logger.new($stdout)
+LOGGER.level = Logger::INFO
+
+# Stub Faktory::Job for standalone execution
+module Faktory
+  module Job
+    def self.included(base)
+      base.extend(ClassMethods)
+    end
+
+    module ClassMethods
+      def faktory_options(*); end
+    end
+  end
+end
+
+Dir[File.join(__dir__, "jobs", "*.rb")].each { |f| require f }
+
+require_relative "lib/profile_validator"
+
+PROFILES_DIR = File.expand_path(ENV.fetch("PROFILES_PATH", "~/GDrive/Meeting Notes/People"))
+
+namespace :profile do
+  desc "Validate a person profile and show missing fields"
+  task :validate, [:name] do |_t, args|
+    if args[:name]
+      path = File.join(PROFILES_DIR, "#{args[:name].downcase.gsub(' ', '-')}.yaml")
+      unless File.exist?(path)
+        puts "Profile not found: #{path}"
+        exit 1
+      end
+      puts ProfileValidator.new(path).report
+    else
+      # Validate all profiles
+      Dir.glob(File.join(PROFILES_DIR, "*.yaml")).each do |path|
+        next if File.basename(path).start_with?("_")
+        puts ProfileValidator.new(path).report
+        puts "\n"
+      end
+    end
+  end
+
+  desc "List all profiles with completeness scores"
+  task :list do
+    profiles = Dir.glob(File.join(PROFILES_DIR, "*.yaml")).reject { |p| File.basename(p).start_with?("_") }
+
+    if profiles.empty?
+      puts "No profiles found in #{PROFILES_DIR}"
+      exit 0
+    end
+
+    puts "Person Profiles"
+    puts "=" * 60
+    puts "#{'Name'.ljust(25)} #{'Personal'.ljust(10)} #{'Overall'.ljust(10)} Last Meeting"
+    puts "-" * 60
+
+    profiles.each do |path|
+      validator = ProfileValidator.new(path)
+      results = validator.validate
+      profile = YAML.load_file(path)
+
+      name = results[:name].to_s[0, 24].ljust(25)
+      personal = "#{results[:completeness][:personal]}%".ljust(10)
+      overall = "#{results[:completeness][:overall]}%".ljust(10)
+      last_meeting = profile.dig("meta", "last_meeting") || "?"
+
+      puts "#{name} #{personal} #{overall} #{last_meeting}"
+    end
+  end
+end
+
+namespace :granola do
+  desc "Sync all Granola meetings to local markdown files"
+  task :sync, [:limit] do |_t, args|
+    limit = (args[:limit] || 200).to_i
+    job = GranolaSyncJob.new
+    result = job.perform("limit" => limit)
+    puts "\nSync complete: #{result[:synced]} new meetings (#{result[:total]} total)"
+  end
+
+  desc "Sync with transcripts included"
+  task :sync_with_transcripts, [:limit] do |_t, args|
+    limit = (args[:limit] || 200).to_i
+    job = GranolaSyncJob.new
+    result = job.perform("limit" => limit, "include_transcript" => true)
+    puts "\nSync complete: #{result[:synced]} new meetings (#{result[:total]} total)"
+  end
+
+  desc "Show sync status (local vs API count)"
+  task :status do
+    notes_dir = GranolaSyncJob::NOTES_DIR
+
+    # Count local files
+    local_count = Dir.glob(File.join(notes_dir, "*.md")).size
+
+    # Count API meetings
+    output, status = Open3.capture2("granola", "meeting", "list", "-o", "json", "--limit", "500")
+    if status.success?
+      api_count = JSON.parse(output).size
+      puts "Local:  #{local_count} meetings"
+      puts "API:    #{api_count} meetings"
+      puts "Missing: #{[api_count - local_count, 0].max} meetings"
+    else
+      puts "Local: #{local_count} meetings"
+      puts "API:   (failed to fetch - run 'granola auth login')"
+    end
+  end
+end

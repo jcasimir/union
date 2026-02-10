@@ -8,6 +8,9 @@
 #   ./bin/enqueue GranolaSyncJob '{"force": true}'
 #   ./bin/enqueue ClaudeJob '"Run /some-skill"'
 
+require_relative "../lib/config"
+Config.export_env!
+
 require "faktory"
 require "json"
 
@@ -26,9 +29,13 @@ end
 
 # Map job types to their queues
 QUEUE_MAP = {
-  "EmailCleanupJob" => "work-laptop",
+  "EmailCleanupJob" => "work-web",
+  "SlackDmTriageJob" => "work-web",
+  "LinkedinDmTriageJob" => "work-web",
+  "CalendarSyncJob" => "work-web",
   "GranolaSyncJob" => "any",
-  "ClaudeJob" => "any"
+  "ClaudeJob" => "any",
+  "SessionHealthJob" => "any"
 }
 
 queue = QUEUE_MAP[JOB_TYPE] || "any"
