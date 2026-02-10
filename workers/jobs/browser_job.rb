@@ -46,7 +46,7 @@ class BrowserJob
     LOGGER.info "Running Claude with Playwright CLI (session: #{session})..."
 
     stdout, stderr, status = Open3.capture3(
-      "claude", "--dangerously-skip-permissions", "--model", "sonnet", "-p", prompt
+      File.expand_path("~/.local/bin/claude"), "--dangerously-skip-permissions", "--model", "sonnet", "-p", prompt
     )
 
     if status.success?
