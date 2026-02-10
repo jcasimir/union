@@ -75,7 +75,7 @@ class BrowserJob
   end
 
   def screen_unlocked?
-    result = `ioreg -n Root -d1 -a | plutil -extract IOConsoleLocked raw - 2>/dev/null`.strip
+    result = `/usr/sbin/ioreg -n Root -d1 -a | /usr/bin/plutil -extract IOConsoleLocked raw - 2>/dev/null`.strip
     result == "false"
   rescue
     true
