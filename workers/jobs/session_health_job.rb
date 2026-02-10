@@ -20,7 +20,7 @@ class SessionHealthJob
   SERVICES = {
     "outlook" => {
       url_key: "outlook.inbox_url",
-      pattern: /inbox|focused|other/i
+      pattern: /mail.*outlook|inbox|focused/i
     },
     "outlook-calendar" => {
       url_key: "outlook.calendar_url",

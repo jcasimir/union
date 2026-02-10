@@ -55,7 +55,13 @@ def check_service(name, config)
   if active.include?(name)
     puts "  Session open, checking auth..."
   else
-    puts "  Starting headed session..."
+    state_file = File.join(AUTH_STATE_DIR, "#{name}.json")
+    if File.exist?(state_file)
+      puts "  Loading saved state and starting headed session..."
+      run_cli(name, "state-load", state_file)
+    else
+      puts "  Starting headed session (no saved state)..."
+    end
     run_cli(name, "open", url, "--headed")
     sleep 3
   end
