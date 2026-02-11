@@ -42,16 +42,19 @@ class SlackDmTriageJob < BrowserJob
       2. Run `snapshot` and look at the Direct Messages section for unread DM conversations (they'll appear bold or have unread indicators)
       3. For each unread DM:
          a. Click the conversation ref and read enough to understand the topic
-         b. Note the person's name and a brief summary of what the DM is about
-         c. Get the current URL using `playwright-cli -s=#{session} evaluate "window.location.href"` — this is the direct link to the DM
-         d. Search Jira project #{Config.get("jira.project_key")} for existing open tasks with summary containing "#{prefix}:" and that person's name using the Atlassian MCP searchJiraIssuesUsingJql tool with cloudId "#{Config.get("jira.cloud_id")}" and JQL like: project = #{Config.get("jira.project_key")} AND summary ~ "#{prefix}: PersonName" AND status != Done
-         e. If no existing task found, create a new Jira Task in project #{Config.get("jira.project_key")} using the Atlassian MCP createJiraIssue tool with:
+         b. Check the timestamp of the NEWEST message in the conversation. If the newest message is less than
+            72 hours old, SKIP this DM — it's still fresh and doesn't need triage yet. Log it as "skipped (too recent)"
+            and move to the next DM.
+         c. Note the person's name and a brief summary of what the DM is about
+         d. Get the current URL using `playwright-cli -s=#{session} evaluate "window.location.href"` — this is the direct link to the DM
+         e. Search Jira project #{Config.get("jira.project_key")} for existing open tasks with summary containing "#{prefix}:" and that person's name using the Atlassian MCP searchJiraIssuesUsingJql tool with cloudId "#{Config.get("jira.cloud_id")}" and JQL like: project = #{Config.get("jira.project_key")} AND summary ~ "#{prefix}: PersonName" AND status != Done
+         f. If no existing task found, create a new Jira Task in project #{Config.get("jira.project_key")} using the Atlassian MCP createJiraIssue tool with:
             - summary: "#{prefix}: {PersonName} about {brief topic}" — for group DMs, use the first person's name plus a count like "#{prefix}: Kyle +2 about project timeline" (meaning Kyle and 2 others)
             - description: A brief summary of the DM content and any action needed
             - additional_fields: {"url": "{slack_dm_url}"}
-         f. Find the message input ref and type: /remind me to respond to this DM in 1 hour
+         g. Find the message input ref and type: /remind me to respond to this DM in 1 hour
             Then press Enter to send the remind command
-      4. After processing all DMs, summarize how many were found and how many Jira tasks were created vs already existed
+      4. After processing all DMs, summarize how many were found, how many skipped (too recent), and how many Jira tasks were created vs already existed
     ACTION
   end
 end
